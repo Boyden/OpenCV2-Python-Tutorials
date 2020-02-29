@@ -542,3 +542,368 @@ ret, otsu = cv2.threshold(blur,0,255,cv2.THRESH_BINARY+cv2.THRESH_OTSU)
 print(thresh,ret)
 
 #Geometric Transformations of Images
+
+# Histograms
+import cv2 
+import numpy as np 
+from matplotlib import pyplot as plt
+img = cv2.imread('data/home.jpg') 
+color = ('b','g','r') 
+for i,col in enumerate(color): 
+	histr = cv2.calcHist([img],[i],None,[256],[0,256]) 
+	plt.plot(histr,color = col) 
+	plt.xlim([0,256]) 
+
+plt.show()
+
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+img = cv2.imread('data/wiki.jpg',0)
+hist,bins = np.histogram(img.flatten(),256,[0,256])
+cdf = hist.cumsum()
+cdf_normalized = cdf * hist.max()/ cdf.max()
+plt.plot(cdf_normalized, color = 'b')
+plt.hist(img.flatten(),256,[0,256], color = 'r')
+plt.xlim([0,256])
+plt.legend(('cdf','histogram'), loc = 'upper left')
+plt.show()
+
+cdf_m = np.ma.masked_equal(cdf,0)
+# not cdf_m*255/cdf_m.max(), avoid the situation that if input is zero, and the output is also zero
+cdf_m = (cdf_m - cdf_m.min())*255/(cdf_m.max()-cdf_m.min())
+cdf = np.ma.filled(cdf_m,0).astype('uint8')
+img2 = cdf[img]
+plt.imshow(img2, cmap='gray')
+
+img = cv2.imread('data/wiki.jpg',0)
+equ = cv2.equalizeHist(img)
+res = np.hstack((img,equ)) #stacking images side-by-side
+cv2.imwrite('data/wiki_equal.jpg',res)
+
+import numpy as np
+import cv2
+img = cv2.imread('data/tsukuba_l.png',0)
+# create a CLAHE object (Arguments are optional).
+clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+cl1 = clahe.apply(img)
+cv2.imwrite('data/clahe_2.jpg',cl1)
+
+import cv2
+import numpy as np
+img = cv2.imread('data/home.jpg')
+hsv = cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
+hist = cv2.calcHist([hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
+
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+img = cv2.imread('data/home.jpg')
+hsv = cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
+hist = cv2.calcHist( [hsv], [0, 1], None, [180, 256], [0, 180, 0, 256] )
+plt.imshow(hist,interpolation = 'nearest')
+plt.show()
+
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+#roi is the object or region of object we need to find
+roi = cv2.imread('data/rose_red.png')
+hsv = cv2.cvtColor(roi,cv2.COLOR_BGR2HSV)
+#target is the image we search in
+target = cv2.imread('data/rose.png')
+hsvt = cv2.cvtColor(target,cv2.COLOR_BGR2HSV)
+# Find the histograms using calcHist. Can be done with np.histogram2d also
+M = cv2.calcHist([hsv],[0, 1], None, [180, 256], [0, 180, 0, 256] )
+I = cv2.calcHist([hsvt],[0, 1], None, [180, 256], [0, 180, 0, 256] )
+
+R = M/I
+
+h,s,v = cv2.split(hsvt)
+B = R[h.ravel(),s.ravel()]
+B = np.minimum(B,1)
+B = B.reshape(hsvt.shape[:2])
+
+disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
+cv2.filter2D(B,-1,disc,B)
+B = np.uint8(B)
+cv2.normalize(B,B,0,255,cv2.NORM_MINMAX)
+
+ret,thresh = cv2.threshold(B,50,255,0)
+
+import cv2
+import numpy as np
+roi = cv2.imread('data/rose_red.png')
+hsv = cv2.cvtColor(roi,cv2.COLOR_BGR2HSV)
+target = cv2.imread('data/rose.png')
+hsvt = cv2.cvtColor(target,cv2.COLOR_BGR2HSV)
+# calculating object histogram
+roihist = cv2.calcHist([hsv],[0, 1], None, [180, 256], [0, 180, 0, 256] )
+# normalize histogram and apply backprojection
+cv2.normalize(roihist,roihist,0,255,cv2.NORM_MINMAX)
+dst = cv2.calcBackProject([hsvt],[0,1],roihist,[0,180,0,256],1)
+# Now convolute with circular disc
+disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
+cv2.filter2D(dst,-1,disc,dst)
+# threshold and binary AND
+ret,thresh = cv2.threshold(dst,50,255,0)
+thresh = cv2.merge((thresh,thresh,thresh))
+res = cv2.bitwise_and(target,thresh)
+res = np.vstack((target,thresh,res))
+cv2.imwrite('data/ros_res.jpg',res)
+
+# add with closing operation
+
+kernel = np.ones((5,5),np.uint8)
+
+import cv2
+import numpy as np
+roi = cv2.imread('data/rose_red.png')
+hsv = cv2.cvtColor(roi,cv2.COLOR_BGR2HSV)
+target = cv2.imread('data/rose.png')
+hsvt = cv2.cvtColor(target,cv2.COLOR_BGR2HSV)
+# calculating object histogram
+roihist = cv2.calcHist([hsv],[0, 1], None, [180, 256], [0, 180, 0, 256] )
+# normalize histogram and apply backprojection
+cv2.normalize(roihist,roihist,0,255,cv2.NORM_MINMAX)
+dst = cv2.calcBackProject([hsvt],[0,1],roihist,[0,180,0,256],1)
+# Now convolute with circular disc
+disc = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(5,5))
+cv2.filter2D(dst,-1,disc,dst)
+# threshold and binary AND
+ret,thresh = cv2.threshold(dst,50,255,0)
+
+thresh =  cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
+thresh = cv2.merge((thresh,thresh,thresh))
+res = cv2.bitwise_and(target,thresh)
+res = np.vstack((target,thresh,res))
+cv2.imwrite('data/ros_res.jpg',res)
+
+# FFT
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+img = cv2.imread('data/messi5.jpg',0)
+f = np.fft.fft2(img)
+fshift = np.fft.fftshift(f)
+magnitude_spectrum = 20*np.log(np.abs(fshift))
+
+plt.subplot(121),plt.imshow(img, cmap = 'gray')
+plt.title('Input Image'), plt.xticks([]), plt.yticks([])
+plt.subplot(122),plt.imshow(magnitude_spectrum, cmap = 'gray')
+plt.title('Magnitude Spectrum'), plt.xticks([]), plt.yticks([])
+plt.show()
+
+rows, cols = img.shape
+crow,ccol = int(rows/2) , int(cols/2)
+fshift[crow-30:crow+30, ccol-30:ccol+30] = 0
+f_ishift = np.fft.ifftshift(fshift)
+img_back = np.fft.ifft2(f_ishift)
+img_back = np.abs(img_back)
+plt.subplot(131),plt.imshow(img, cmap = 'gray')
+plt.title('Input Image'), plt.xticks([]), plt.yticks([])
+plt.subplot(132),plt.imshow(img_back, cmap = 'gray')
+plt.title('Image after HPF'), plt.xticks([]), plt.yticks([])
+plt.subplot(133),plt.imshow(img_back)
+plt.title('Result in JET'), plt.xticks([]), plt.yticks([])
+plt.show()
+
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+img = cv2.imread('data/messi5.jpg',0)
+dft = cv2.dft(np.float32(img),flags = cv2.DFT_COMPLEX_OUTPUT)
+dft_shift = np.fft.fftshift(dft)
+magnitude_spectrum = 20*np.log(cv2.magnitude(dft_shift[:,:,0],dft_shift[:,:,1]))
+plt.subplot(121),plt.imshow(img, cmap = 'gray')
+plt.title('Input Image'), plt.xticks([]), plt.yticks([])
+plt.subplot(122),plt.imshow(magnitude_spectrum, cmap = 'gray')
+plt.title('Magnitude Spectrum'), plt.xticks([]), plt.yticks([])
+plt.show()
+
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+# simple averaging filter without scaling parameter
+mean_filter = np.ones((3,3))
+# creating a guassian filter
+x = cv2.getGaussianKernel(5,10)
+gaussian = x*x.T
+# different edge detecting filters
+# scharr in x-direction
+scharr = np.array([[-3, 0, 3],
+[-10,0,10],
+[-3, 0, 3]])
+# sobel in x direction
+sobel_x= np.array([[-1, 0, 1],
+[-2, 0, 2],
+[-1, 0, 1]])
+
+# sobel in y direction
+sobel_y= np.array([[-1,-2,-1],
+[0, 0, 0],
+[1, 2, 1]])
+# laplacian
+laplacian=np.array([[0, 1, 0],
+[1,-4, 1],
+[0, 1, 0]])
+filters = [mean_filter, gaussian, laplacian, sobel_x, sobel_y, scharr]
+filter_name = ['mean_filter', 'gaussian','laplacian', 'sobel_x', \
+'sobel_y', 'scharr_x']
+fft_filters = [np.fft.fft2(x) for x in filters]
+fft_shift = [np.fft.fftshift(y) for y in fft_filters]
+mag_spectrum = [np.log(np.abs(z)+1) for z in fft_shift]
+for i in range(6):
+    plt.subplot(2,3,i+1),plt.imshow(mag_spectrum[i],cmap = 'gray')
+    plt.title(filter_name[i]), plt.xticks([]), plt.yticks([])
+plt.show()
+
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+img = cv2.imread('data/messi5.jpg',0)
+img2 = img.copy()
+template = cv2.imread('data/messi_face.jpg',0)
+
+w, h = template.shape[::-1]
+# All the 6 methods for comparison in a list
+methods = ['cv2.TM_CCOEFF', 'cv2.TM_CCOEFF_NORMED', 'cv2.TM_CCORR',
+'cv2.TM_CCORR_NORMED', 'cv2.TM_SQDIFF', 'cv2.TM_SQDIFF_NORMED']
+for meth in methods:
+    img = img2.copy()
+    method = eval(meth)
+    # Apply template Matching
+    res = cv2.matchTemplate(img,template,method)
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+    # If the method is TM_SQDIFF or TM_SQDIFF_NORMED, take minimum
+    if method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
+        top_left = min_loc
+    else:
+        top_left = max_loc
+    bottom_right = (top_left[0] + w, top_left[1] + h)
+    cv2.rectangle(img,top_left, bottom_right, 255, 2)
+    plt.subplot(121),plt.imshow(res,cmap = 'gray')
+    plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
+    plt.subplot(122),plt.imshow(img,cmap = 'gray')
+    plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
+    plt.suptitle(meth)
+    plt.show()
+
+
+import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+img_rgb = cv2.imread('data/mario.png')
+img_gray = cv2.cvtColor(img_rgb, cv2.COLOR_BGR2GRAY)
+template = cv2.imread('data/mario_coin.png',0)
+w, h = template.shape[::-1]
+res = cv2.matchTemplate(img_gray,template,cv2.TM_CCOEFF_NORMED)
+threshold = 0.8
+
+loc = np.where( res >= threshold)
+for pt in zip(*loc[::-1]):
+    cv2.rectangle(img_rgb, pt, (pt[0] + w, pt[1] + h), (0,0,255), 2)
+cv2.imwrite('data/mario_res.png',img_rgb)
+
+
+import cv2
+import numpy as np
+
+img = cv2.imread('data/dave.jpg')
+gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+edges = cv2.Canny(gray,50,150,apertureSize = 3)
+lines = cv2.HoughLines(edges,1,np.pi/180,110)
+for rho,theta in lines[:, 0, :]:
+	a = np.cos(theta)
+	b = np.sin(theta)
+	x0 = a*rho
+	y0 = b*rho
+	x1 = int(x0 + 1000*(-b))
+	y1 = int(y0 + 1000*(a))
+	x2 = int(x0 - 1000*(-b))
+	y2 = int(y0 - 1000*(a))
+	cv2.line(img,(x1,y1),(x2,y2),(0,0,255),2)
+
+cv2.imwrite('data/houghlines3.jpg',img)
+
+import cv2
+import numpy as np
+img = cv2.imread('data/dave.jpg')
+gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+edges = cv2.Canny(gray,50,150,apertureSize = 3)
+minLineLength = 100
+maxLineGap = 10
+lines = cv2.HoughLinesP(edges,1,np.pi/180,100,minLineLength,maxLineGap)
+for x1,y1,x2,y2 in lines[:, 0, :]:
+    cv2.line(img,(x1,y1),(x2,y2),(0,255,0),2)
+cv2.imwrite('data/houghlines5.jpg',img)
+
+import cv2
+import numpy as np
+img = cv2.imread('data/opencv_logo.png',0)
+img = cv2.medianBlur(img,5)
+cimg = cv2.cvtColor(img,cv2.COLOR_GRAY2BGR)
+circles = cv2.HoughCircles(img,cv2.HOUGH_GRADIENT,1,20,
+param1=50,param2=30,minRadius=0,maxRadius=0)
+circles = np.uint16(np.around(circles))
+for i in circles[0,:]:
+	# draw the outer circle
+	cv2.circle(cimg,(i[0],i[1]),i[2],(0,255,0),2)
+	# draw the center of the circle
+	cv2.circle(cimg,(i[0],i[1]),2,(0,0,255),3)
+cv2.imshow('detected circles',cimg)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+img = cv2.imread('data/coins.jpg')
+gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+ret, thresh = cv2.threshold(gray,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+
+# noise removal
+kernel = np.ones((3,3),np.uint8)
+opening = cv2.morphologyEx(thresh,cv2.MORPH_OPEN,kernel, iterations = 2)
+# sure background area
+sure_bg = cv2.dilate(opening,kernel,iterations=3)
+# Finding sure foreground area
+dist_transform = cv2.distanceTransform(opening,cv2.DIST_L2,5)
+ret, sure_fg = cv2.threshold(dist_transform,0.7*dist_transform.max(),255,0)
+# Finding unknown region
+sure_fg = np.uint8(sure_fg)
+unknown = cv2.subtract(sure_bg,sure_fg)
+
+# Marker labelling
+ret, markers = cv2.connectedComponents(sure_fg)
+# Add one to all labels so that sure background is not 0, but 1
+markers = markers+1
+# Now, mark the region of unknown with zero
+markers[unknown==255] = 0
+
+markers = cv2.watershed(img,markers)
+img[markers == -1] = [255,0,0]
+
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+img = cv2.imread('data/messi5.jpg')
+mask = np.zeros(img.shape[:2],np.uint8)
+bgdModel = np.zeros((1,65),np.float64)
+fgdModel = np.zeros((1,65),np.float64)
+rect = (50,50,450,290)
+cv2.grabCut(img,mask,rect,bgdModel,fgdModel,5,cv2.GC_INIT_WITH_RECT)
+mask2 = np.where((mask==2)|(mask==0),0,1).astype('uint8')
+img = img*mask2[:,:,np.newaxis]
+plt.imshow(img),plt.colorbar(),plt.show()
+
+# newmask is the mask image I manually labelled
+newmask = cv2.imread('data/newmask.png',0)
+# whereever it is marked white (sure foreground), change mask=1
+# whereever it is marked black (sure background), change mask=0
+mask[newmask == 0] = 0
+mask[newmask == 255] = 1
+mask, bgdModel, fgdModel = cv2.grabCut(img,mask,None,bgdModel,fgdModel,5,cv2.GC_INIT_WITH_MASK)
+mask = np.where((mask==2)|(mask==0),0,1).astype('uint8')
+img = img*mask[:,:,np.newaxis]
+plt.imshow(img),plt.colorbar(),plt.show()
