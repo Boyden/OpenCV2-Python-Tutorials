@@ -907,3 +907,287 @@ mask, bgdModel, fgdModel = cv2.grabCut(img,mask,None,bgdModel,fgdModel,5,cv2.GC_
 mask = np.where((mask==2)|(mask==0),0,1).astype('uint8')
 img = img*mask[:,:,np.newaxis]
 plt.imshow(img),plt.colorbar(),plt.show()
+
+# feature detection
+import cv2
+import numpy as np
+filename = 'data/chessboard.jpg'
+img = cv2.imread(filename)
+
+gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+gray = np.float32(gray)
+dst = cv2.cornerHarris(gray,2,3,0.04)
+#result is dilated for marking the corners, not important
+dst = cv2.dilate(dst,None)
+# Threshold for an optimal value, it may vary depending on the image.
+img[dst>0.01*dst.max()]=[0,0,255]
+cv2.imshow('dst',img)
+if cv2.waitKey(0) & 0xff == 27:
+    cv2.destroyAllWindows()
+
+import cv2
+import numpy as np
+filename = 'data/chessboard.jpg'
+img = cv2.imread(filename)
+gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+# find Harris corners
+gray = np.float32(gray)
+dst = cv2.cornerHarris(gray,2,3,0.04)
+dst = cv2.dilate(dst,None)
+ret, dst = cv2.threshold(dst,0.01*dst.max(),255,0)
+dst = np.uint8(dst)
+# find centroids
+ret, labels, stats, centroids = cv2.connectedComponentsWithStats(dst)
+# define the criteria to stop and refine the corners
+criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 100, 0.001)
+corners = cv2.cornerSubPix(gray,np.float32(centroids),(5,5),(-1,-1),criteria)
+# Now draw them
+res = np.hstack((centroids,corners))
+res = np.int0(res)
+img[res[:,1],res[:,0]]=[0,0,255]
+img[res[:,3],res[:,2]] = [0,255,0]
+cv2.imwrite('data/subpixel5.png',img)
+
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+img = cv2.imread('data/simple.jpg')
+gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+corners = cv2.goodFeaturesToTrack(gray,25,0.01,10)
+corners = np.int0(corners)
+for i in corners:
+    x,y = i.ravel()
+    cv2.circle(img,(x,y),3,255,-1)
+
+plt.imshow(img),plt.show()
+
+# sift
+import cv2
+import numpy as np
+img = cv2.imread('data/home.jpg')
+
+gray= cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+sift = cv2.xfeatures2d.SIFT_create()
+kp = sift.detect(gray,None)
+cv2.drawKeypoints(gray, kp, img, flags=cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+cv2.imwrite('data/sift_keypoints.jpg',img)
+
+kp, des = sift.detectAndCompute(gray,None)
+
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+img = cv2.imread('data/simple.jpg',0)
+# Initiate FAST object with default values
+fast = cv2.FastFeatureDetector_create()
+# find and draw the keypoints
+kp = fast.detect(img,None)
+img2 = cv2.drawKeypoints(img, kp, None, color=(255,0,0))
+# Print all default params
+print("Threshold: ", fast.getThreshold())
+print("nonmaxSuppression: ", fast.getNonmaxSuppression())
+print("neighborhood: ", fast.getType())
+print("Total Keypoints with nonmaxSuppression: ", len(kp))
+cv2.imwrite('data/fast_true.png',img2)
+# Disable nonmaxSuppression
+fast.setNonmaxSuppression(0)
+kp = fast.detect(img,None)
+print("Total Keypoints without nonmaxSuppression: ", len(kp))
+img3 = cv2.drawKeypoints(img, kp, None, color=(255,0,0))
+cv2.imwrite('data/fast_false.png',img3)
+
+import numpy as np
+import cv2 as cv
+from matplotlib import pyplot as plt
+img = cv.imread('data/simple.jpg',0)
+# Initiate FAST detector
+star = cv.xfeatures2d.StarDetector_create()
+# Initiate BRIEF extractor
+brief = cv.xfeatures2d.BriefDescriptorExtractor_create()
+# find the keypoints with STAR
+kp = star.detect(img,None)
+# compute the descriptors with BRIEF
+kp, des = brief.compute(img, kp)
+print( brief.descriptorSize() )
+print( des.shape )
+
+# ORB
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+img = cv2.imread('data/simple.jpg',0)
+# Initiate STAR detector
+orb = cv2.ORB_create()
+# find the keypoints with ORB
+kp = orb.detect(img,None)
+# compute the descriptors with ORB
+kp, des = orb.compute(img, kp)
+# draw only keypoints location,not size and orientation
+img2 = cv2.drawKeypoints(img,kp,None, color=(0,255,0), flags=0)
+plt.imshow(img2),plt.show()
+
+import numpy as np
+import cv2
+from matplotlib import pyplot as plt
+img1 = cv2.imread('data/book.png',0) # queryImage
+img2 = cv2.imread('data/box_in_scene.png',0) # trainImage
+# Initiate SIFT detector
+orb = cv2.ORB_create()
+# find the keypoints and descriptors with SIFT
+kp1, des1 = orb.detectAndCompute(img1,None)
+kp2, des2 = orb.detectAndCompute(img2,None)
+
+# create BFMatcher object
+bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+# Match descriptors.
+matches = bf.match(des1,des2)
+# Sort them in the order of their distance.
+matches = sorted(matches, key = lambda x:x.distance)
+
+# Draw first 10 matches.
+img3 = cv2.drawMatches(img1,kp1,img2,kp2,matches[:10], None, flags=2)
+plt.imshow(img3),plt.show()
+
+import numpy as np
+import cv2 as cv
+import matplotlib.pyplot as plt
+img1 = cv.imread('data/book.png',cv.IMREAD_GRAYSCALE)          # queryImage
+img2 = cv.imread('data/box_in_scene.png',cv.IMREAD_GRAYSCALE) # trainImage
+# Initiate SIFT detector
+sift = cv.xfeatures2d.SIFT_create()
+# find the keypoints and descriptors with SIFT
+kp1, des1 = sift.detectAndCompute(img1,None)
+kp2, des2 = sift.detectAndCompute(img2,None)
+# BFMatcher with default params
+bf = cv.BFMatcher()
+matches = bf.knnMatch(des1,des2,k=2)
+# Apply ratio test
+good = []
+for m,n in matches:
+    if m.distance < 0.75*n.distance:
+        good.append([m])
+# cv.drawMatchesKnn expects list of lists as matches.
+img3 = cv.drawMatchesKnn(img1,kp1,img2,kp2,good,None,flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+plt.imshow(img3),plt.show()
+
+import numpy as np
+import cv2 as cv
+import matplotlib.pyplot as plt
+img1 = cv.imread('data/book.png',cv.IMREAD_GRAYSCALE)          # queryImage
+img2 = cv.imread('data/box_in_scene.png',cv.IMREAD_GRAYSCALE) # trainImage
+# Initiate SIFT detector
+sift = cv.xfeatures2d.SIFT_create()
+# find the keypoints and descriptors with SIFT
+kp1, des1 = sift.detectAndCompute(img1,None)
+kp2, des2 = sift.detectAndCompute(img2,None)
+# FLANN parameters
+FLANN_INDEX_KDTREE = 1
+index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+search_params = dict(checks=50)   # or pass empty dictionary
+flann = cv.FlannBasedMatcher(index_params,search_params)
+matches = flann.knnMatch(des1,des2,k=2)
+# Need to draw only good matches, so create a mask
+matchesMask = [[0,0] for i in range(len(matches))]
+# ratio test as per Lowe's paper
+for i,(m,n) in enumerate(matches):
+    if m.distance < 0.7*n.distance:
+        matchesMask[i]=[1,0]
+draw_params = dict(matchColor = (0,255,0),
+                   singlePointColor = (255,0,0),
+                   matchesMask = matchesMask,
+                   flags = cv.DrawMatchesFlags_DEFAULT)
+img3 = cv.drawMatchesKnn(img1,kp1,img2,kp2,matches,None,**draw_params)
+plt.imshow(img3,),plt.show()
+
+
+import numpy as np
+import cv2 as cv
+from matplotlib import pyplot as plt
+MIN_MATCH_COUNT = 10
+img1 = cv.imread('data/book.png',0)          # queryImage
+img2 = cv.imread('data/box_in_scene.png',0) # trainImage
+# Initiate SIFT detector
+sift = cv.xfeatures2d.SIFT_create()
+# find the keypoints and descriptors with SIFT
+kp1, des1 = sift.detectAndCompute(img1,None)
+kp2, des2 = sift.detectAndCompute(img2,None)
+FLANN_INDEX_KDTREE = 1
+index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)
+search_params = dict(checks = 50)
+flann = cv.FlannBasedMatcher(index_params, search_params)
+matches = flann.knnMatch(des1,des2,k=2)
+# store all the good matches as per Lowe's ratio test.
+good = []
+for m,n in matches:
+    if m.distance < 0.7*n.distance:
+        good.append(m)
+
+if len(good)>MIN_MATCH_COUNT:
+    src_pts = np.float32([ kp1[m.queryIdx].pt for m in good ]).reshape(-1,1,2)
+    dst_pts = np.float32([ kp2[m.trainIdx].pt for m in good ]).reshape(-1,1,2)
+    M, mask = cv.findHomography(src_pts, dst_pts, cv.RANSAC,5.0)
+    matchesMask = mask.ravel().tolist()
+    h,w = img1.shape
+    pts = np.float32([ [0,0],[0,h-1],[w-1,h-1],[w-1,0] ]).reshape(-1,1,2)
+    dst = cv.perspectiveTransform(pts,M)
+    img2 = cv.polylines(img2,[np.int32(dst)],True,255,3, cv.LINE_AA)
+else:
+    print( "Not enough matches are found - {}/{}".format(len(good), MIN_MATCH_COUNT) )
+    matchesMask = None
+
+draw_params = dict(matchColor = (0,255,0), # draw matches in green color
+                   singlePointColor = None,
+                   matchesMask = matchesMask, # draw only inliers
+                   flags = 2)
+img3 = cv.drawMatches(img1,kp1,img2,kp2,good,None,**draw_params)
+plt.imshow(img3, 'gray'),plt.show()
+
+import numpy as np
+import cv2 as cv
+import argparse
+
+parser = argparse.ArgumentParser(description='This sample demonstrates the meanshift algorithm. \
+                                              The example file can be downloaded from: \
+                                              https://www.bogotobogo.com/python/OpenCV_Python/images/mean_shift_tracking/slow_traffic_small.mp4')
+parser.add_argument('image', type=str, help='path to image file')
+args = parser.parse_args()
+
+cap = cv.VideoCapture(args.image)
+
+# take first frame of the video
+ret,frame = cap.read()
+
+# setup initial location of window
+x, y, w, h = 300, 200, 100, 50 # simply hardcoded the values
+track_window = (x, y, w, h)
+
+# set up the ROI for tracking
+roi = frame[y:y+h, x:x+w]
+hsv_roi =  cv.cvtColor(roi, cv.COLOR_BGR2HSV)
+mask = cv.inRange(hsv_roi, np.array((0., 60.,32.)), np.array((180.,255.,255.)))
+roi_hist = cv.calcHist([hsv_roi],[0],mask,[180],[0,180])
+cv.normalize(roi_hist,roi_hist,0,255,cv.NORM_MINMAX)
+
+# Setup the termination criteria, either 10 iteration or move by atleast 1 pt
+term_crit = ( cv.TERM_CRITERIA_EPS | cv.TERM_CRITERIA_COUNT, 10, 1 )
+
+while(1):
+    ret, frame = cap.read()
+
+    if ret == True:
+        hsv = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
+        dst = cv.calcBackProject([hsv],[0],roi_hist,[0,180],1)
+
+        # apply meanshift to get the new location
+        ret, track_window = cv.meanShift(dst, track_window, term_crit)
+
+        # Draw it on image
+        x,y,w,h = track_window
+        img2 = cv.rectangle(frame, (x,y), (x+w,y+h), 255,2)
+        cv.imshow('img2',img2)
+
+        k = cv.waitKey(30) & 0xff
+        if k == 27:
+            break
+    else:
+        break
