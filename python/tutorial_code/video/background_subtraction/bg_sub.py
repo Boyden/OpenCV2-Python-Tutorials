@@ -17,11 +17,13 @@ else:
 ## [create]
 
 ## [capture]
-capture = cv.VideoCapture(cv.samples.findFileOrKeep(args.input))
+capture = cv.VideoCapture(args.input)
 if not capture.isOpened:
     print('Unable to open: ' + args.input)
     exit(0)
 ## [capture]
+
+kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE,(3,3))
 
 while True:
     ret, frame = capture.read()
@@ -31,6 +33,7 @@ while True:
     ## [apply]
     #update the background model
     fgMask = backSub.apply(frame)
+    fgMask = cv.morphologyEx(fgMask, cv.MORPH_OPEN, kernel)
     ## [apply]
 
     ## [display_frame_number]
